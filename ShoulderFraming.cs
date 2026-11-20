@@ -9,8 +9,10 @@ internal enum ZoomStyle { Dolly, LensWithPan, LensOnly }
 
 internal static class ShoulderFraming
 {
-    private const byte LalafellRace = 4;
+    internal const byte LalafellRace = 4;
     private const float LalafellScreenRaise = .14f;
+    private const float LalafellReticleHeight = .43f;
+    private const float ReticleHeadClearance = .025f;
 
 #if ACTIONCAM_DOLLY
     internal const float DefaultMagnification = 3.0f;
@@ -42,6 +44,11 @@ internal static class ShoulderFraming
         race == LalafellRace && unzoomedFieldOfView is > 0f and < MathF.PI
             ? -MathF.Atan(2f * LalafellScreenRaise * MathF.Tan(unzoomedFieldOfView * .5f))
             : 0f;
+
+    internal static float LalafellReticleY(float headY) =>
+        float.IsFinite(headY)
+            ? Math.Clamp(headY - ReticleHeadClearance, .08f, LalafellReticleHeight)
+            : LalafellReticleHeight;
 
     internal static (Vector3 Position, Vector3 LookAt) Offsets(Vector3 position, Vector3 lookAt, float shoulder,
         float magnification, ZoomStyle style, float elevation)

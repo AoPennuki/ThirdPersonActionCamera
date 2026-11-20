@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Conditions;
+using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Command;
 using Dalamud.Hooking;
 using Dalamud.Plugin;
@@ -10,6 +11,7 @@ using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Kernel;
 using FFXIVClientStructs.FFXIV.Client.System.Input;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Misc;
@@ -63,6 +65,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
     private SceneCamera* framedCamera;
     private (Vector3 Position, Vector3 LookAt) framedOffset;
     private bool framingView;
+    private float reticleY = .5f;
 
     public Plugin(IDalamudPluginInterface pluginInterface, IFramework framework, IClientState client,
         IObjectTable objects, ICondition conditions, ICommandManager commands, IChatGui chat,
@@ -235,8 +238,9 @@ public sealed unsafe class Plugin : IDalamudPlugin
                     cursorOwner = stage;
                     captured = true;
                 }
-                Filter(ref input->CursorInputs);
-                Filter(ref input->UIFilteredCursorInputs);
+                int targetY = (int)(stage->ScreenSize.Height * reticleY);
+                Filter(ref input->CursorInputs, targetY);
+                Filter(ref input->UIFilteredCursorInputs, targetY);
                 MouseDevice.ScheduleCursorMove(centerX, centerY);
                 stage->AtkCursor.SetVisible(false);
             }
@@ -261,7 +265,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
         return result;
     }
 
-    private void Filter(ref CursorInputData input)
+    private void Filter(ref CursorInputData input, int targetY)
     {
         const MouseButtonFlags clicks = MouseButtonFlags.LBUTTON | MouseButtonFlags.RBUTTON;
         input.MouseButtonHeldFlags &= ~clicks;
@@ -269,7 +273,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
         input.MouseButtonReleasedFlags &= ~clicks;
         input.MouseButtonHeldThrottledFlags &= ~clicks;
         input.PositionX = centerX;
-        input.PositionY = centerY;
+        input.PositionY = targetY;
         input.DeltaX = dx;
         input.DeltaY = dy;
     }
@@ -337,17 +341,37 @@ public sealed unsafe class Plugin : IDalamudPlugin
         if (ShoulderFraming.Style == ZoomStyle.Dolly) AdvanceFraming(active);
         framedCamera = scene;
         var magnification = ShoulderFraming.Magnification(aim, aimMagnification);
-        var elevation = ShoulderFraming.AimElevation(objects.LocalPlayer?.CustomizeData.Race ?? 0, lens.UnzoomedFieldOfView(active));
+        var player = objects.LocalPlayer;
+        byte race = player?.CustomizeData.Race ?? 0;
+        var elevation = ShoulderFraming.AimElevation(race, lens.UnzoomedFieldOfView(active));
         framedOffset = ShoulderFraming.Offsets(scene->Position, scene->LookAtVector, blendedShoulder,
             magnification, ShoulderFraming.Style, elevation);
         var view = new ShoulderViewScope(scene, framedOffset);
         framingView = true;
-        try { viewHook!.Original(scene); }
+        try
+        {
+            viewHook!.Original(scene);
+            reticleY = player is not null && race == ShoulderFraming.LalafellRace
+                ? ShoulderFraming.LalafellReticleY(ProjectHeadY(scene, player)) : .5f;
+        }
         finally
         {
             view.Restore(scene);
             framingView = false;
         }
+    }
+
+    private static float ProjectHeadY(SceneCamera* scene, IGameObject player)
+    {
+        var actor = (GameObject*)player.Address;
+        var device = Device.Instance();
+        if (actor == null || actor->VirtualTable == null || actor->VirtualTable->GetHeight == null || scene->RenderCamera == null ||
+            device == null || device->Height == 0) return float.NaN;
+
+        float height = actor->GetHeight();
+        if (!float.IsFinite(height) || height <= 0f) return float.NaN;
+        var head = player.Position + Vector3.UnitY * height;
+        return scene->WorldToScreen(head, out var screen) ? screen.Y / device->Height : float.NaN;
     }
 
     private GameObject* ResolvePlaceholder(PronounModule* module, CStringPointer token, byte mode, byte flags, bool extra)
@@ -357,14 +381,14 @@ public sealed unsafe class Plugin : IDalamudPlugin
             if (captured && !Paused && IsMouseover((byte*)token))
             {
                 var camera = ActiveThirdPersonCamera();
-                if (camera != null) return CenterTarget(camera);
+                if (camera != null) return ReticleTarget(camera);
             }
         }
         catch (Exception ex) { Fail(ex); }
         return macroHook!.Original(module, token, mode, flags, extra);
     }
 
-    private GameObject* CenterTarget(Camera* camera)
+    private GameObject* ReticleTarget(Camera* camera)
     {
         var targets = TargetSystem.Instance();
         var stage = AtkStage.Instance();
@@ -378,7 +402,8 @@ public sealed unsafe class Plugin : IDalamudPlugin
         var view = new ShoulderViewScope(scene, !framingView && scene == framedCamera ? framedOffset : default);
         try
         {
-            var target = targets->GetMouseOverObject(stage->ScreenSize.Width / 2, stage->ScreenSize.Height / 2, filter, camera);
+            var target = targets->GetMouseOverObject(stage->ScreenSize.Width / 2,
+                (int)(stage->ScreenSize.Height * reticleY), filter, camera);
             return target != null && target->GetIsTargetable() && objects.LocalPlayer?.Address != (nint)target ? target : null;
         }
         finally { view.Restore(scene); }
@@ -406,7 +431,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
                     if (adjusted != 0 && actions.GetRowOrDefault(adjusted) is { } row &&
                         (row.TargetArea || UsesExternalTarget(row)))
                     {
-                        var picked = CenterTarget(camera);
+                        var picked = ReticleTarget(camera);
                         ulong id = picked == null ? 0 : picked->GetGameObjectId();
                         if (id is not (0 or 0xE0000000))
                         {
@@ -441,10 +466,10 @@ public sealed unsafe class Plugin : IDalamudPlugin
         platformTextInput = ImGui.GetIO().WantTextInput;
         if (!CaptureUsable) return;
         var viewport = ImGui.GetMainViewport();
-        var center = viewport.Pos + viewport.Size * .5f;
+        var position = viewport.Pos + viewport.Size * new Vector2(.5f, reticleY);
         var list = ImGui.GetForegroundDrawList();
-        list.AddCircleFilled(center, 3.5f, 0xD0000000);
-        list.AddCircleFilled(center, 2f, 0xFFFFFFFF);
+        list.AddCircleFilled(position, 3.5f, 0xD0000000);
+        list.AddCircleFilled(position, 2f, 0xFFFFFFFF);
     }
 
     private void Update(IFramework _)
@@ -463,6 +488,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
         lensCamera = null;
         framedCamera = null;
         framedOffset = default;
+        reticleY = .5f;
         lastFrame = 0;
         aim = 0;
         smoothAim = default;
