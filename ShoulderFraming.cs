@@ -10,7 +10,7 @@ internal enum ZoomStyle { Dolly, LensWithPan, LensOnly }
 internal static class ShoulderFraming
 {
     private const byte LalafellRace = 4;
-    private const float LalafellAimRaise = .14f;
+    private const float LalafellScreenRaise = .14f;
 
 #if ACTIONCAM_DOLLY
     internal const float DefaultMagnification = 3.0f;
@@ -37,9 +37,10 @@ internal static class ShoulderFraming
     internal static float ZoomFieldOfView(float fieldOfView, float magnification) =>
         2f * MathF.Atan(MathF.Tan(fieldOfView * .5f) / magnification);
 
+    // Tilting down moves a fixed world point up in the rendered image.
     internal static float AimElevation(byte race, float unzoomedFieldOfView) =>
         race == LalafellRace && unzoomedFieldOfView is > 0f and < MathF.PI
-            ? MathF.Atan(2f * LalafellAimRaise * MathF.Tan(unzoomedFieldOfView * .5f))
+            ? -MathF.Atan(2f * LalafellScreenRaise * MathF.Tan(unzoomedFieldOfView * .5f))
             : 0f;
 
     internal static (Vector3 Position, Vector3 LookAt) Offsets(Vector3 position, Vector3 lookAt, float shoulder,
@@ -83,7 +84,8 @@ internal static class ShoulderFraming
         var right = Vector3.Cross(view, Vector3.UnitY);
         float horizontal = right.Length();
         float pitch = MathF.Atan2(view.Y, horizontal);
-        float rotation = Math.Min(elevation, Math.Max(0f, 89.5f * MathF.PI / 180f - pitch));
+        const float pitchLimit = 89.5f * MathF.PI / 180f;
+        float rotation = Math.Clamp(elevation, Math.Min(0f, -pitchLimit - pitch), Math.Max(0f, pitchLimit - pitch));
         var up = Vector3.Cross(right / horizontal, view);
         return view * (MathF.Cos(rotation) - 1f) + up * MathF.Sin(rotation);
     }

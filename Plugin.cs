@@ -29,6 +29,8 @@ public sealed unsafe class Plugin : IDalamudPlugin
     private const string LegacyCommand = "/actioncam";
     private const string CommandHelp = "/acti on 开启，/acti off 关闭。";
     private const int ReleaseKey = MouseLookKeys.DefaultKey;
+    private const int LeftMouseButton = 0x01;
+    private const int RightMouseButton = 0x02;
     private readonly IDalamudPluginInterface pluginInterface;
     private readonly IFramework framework;
     private readonly IClientState client;
@@ -43,7 +45,6 @@ public sealed unsafe class Plugin : IDalamudPlugin
     private readonly MouseLookState state = new();
     private readonly MouseLookDragPatch drag = new();
     private readonly LensZoom lens = new();
-    private Hook<MouseDevice.Delegates.ProcessMouseInputMessage>? mouseMessageHook;
     private Hook<AtkModule.Delegates.HandleInput>? inputHook;
     private Hook<Camera.Delegates.GetCameraInputSource>? cameraHook;
     private Hook<PronounModule.Delegates.ResolvePlaceholder>? macroHook;
@@ -149,7 +150,6 @@ public sealed unsafe class Plugin : IDalamudPlugin
         var scene = camera == null ? null : &camera->SceneCamera;
         if (InputManager.Instance() == null ||
             (nint)MouseDevice.MemberFunctionPointers.ScheduleCursorMove == 0 ||
-            (nint)MouseDevice.MemberFunctionPointers.ProcessMouseInputMessage == 0 ||
             (nint)AtkCursor.MemberFunctionPointers.SetVisible == 0 ||
             (nint)AtkModule.MemberFunctionPointers.IsTextInputActive == 0 ||
             (nint)TargetSystem.MemberFunctionPointers.GetMouseOverObject == 0 ||
@@ -165,8 +165,6 @@ public sealed unsafe class Plugin : IDalamudPlugin
             scene == null || scene->VirtualTable == null || (nint)scene->VirtualTable->UpdateRender == 0)
             throw new InvalidOperationException("Third-person input or native mouseover is unavailable.");
 
-        mouseMessageHook = interop.HookFromAddress<MouseDevice.Delegates.ProcessMouseInputMessage>(
-            (nint)MouseDevice.MemberFunctionPointers.ProcessMouseInputMessage, ProcessMouseInputMessage);
         inputHook = interop.HookFromAddress<AtkModule.Delegates.HandleInput>(
             (nint)AtkModule.MemberFunctionPointers.HandleInput, HandleInput);
         cameraHook = interop.HookFromAddress<Camera.Delegates.GetCameraInputSource>(
@@ -185,7 +183,6 @@ public sealed unsafe class Plugin : IDalamudPlugin
         viewHook.Enable();
         lensHook?.Enable();
         cameraHook.Enable();
-        mouseMessageHook.Enable();
         inputHook.Enable();
     }
 
@@ -208,18 +205,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
 
     private bool Paused => nativeTextInput || platformTextInput || MouseLookKeys.Down(ReleaseKey);
     private bool CaptureUsable => captured && !Paused && ActiveThirdPersonCamera() != null;
-
-    private void ProcessMouseInputMessage(nint window, uint message, nint parameter)
-    {
-        const uint leftDown = 0x0201, leftDoubleClick = 0x0203;
-        try
-        {
-            // Movement also reads native button state before the UI filter.
-            if (message is leftDown or leftDoubleClick && CaptureUsable) return;
-        }
-        catch (Exception ex) { Fail(ex); }
-        mouseMessageHook!.Original(window, message, parameter);
-    }
+    private static bool MouseForwardHeld => MouseLookKeys.Down(LeftMouseButton) && MouseLookKeys.Down(RightMouseButton);
 
     private byte HandleInput(AtkModule* module, UIInputData* input, bool padMouse)
     {
@@ -266,7 +252,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
             var manager = InputManager.Instance();
             if (CaptureUsable && stage != null && stage == cursorOwner && manager != null)
             {
-                drag.Apply(manager, centerX, centerY, dx, dy);
+                drag.Apply(manager, centerX, centerY, dx, dy, moveForward: MouseForwardHeld);
                 stage->AtkCursor.SetVisible(false);
             }
             else Release();
@@ -295,7 +281,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
             var manager = InputManager.Instance();
             if (CaptureUsable && manager != null)
             {
-                drag.Apply(manager, centerX, centerY, dx, dy);
+                drag.Apply(manager, centerX, centerY, dx, dy, moveForward: MouseForwardHeld);
                 return CameraInputSource.MouseDrag;
             }
             Release();
@@ -334,7 +320,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
         lastFrame = now;
         float weight = 1f - MathF.Exp(-16f * seconds);
         blendedShoulder += (shoulderSide - blendedShoulder) * weight;
-        bool held = CaptureUsable && MouseLookKeys.Down(0x02);
+        bool held = CaptureUsable && MouseLookKeys.Down(RightMouseButton);
         aim = ShoulderFraming.Style == ZoomStyle.Dolly
             ? ShoulderFraming.AdvanceAim(aim, held, seconds)
             : smoothAim.Advance(held, seconds);
@@ -512,14 +498,12 @@ public sealed unsafe class Plugin : IDalamudPlugin
     private void DisposeHooks()
     {
         inputHook?.Dispose();
-        mouseMessageHook?.Dispose();
         actionHook?.Dispose();
         viewHook?.Dispose();
         lensHook?.Dispose();
         cameraHook?.Dispose();
         macroHook?.Dispose();
         inputHook = null;
-        mouseMessageHook = null;
         actionHook = null;
         viewHook = null;
         lensHook = null;

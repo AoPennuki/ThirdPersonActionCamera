@@ -18,14 +18,14 @@ internal sealed unsafe class MouseLookDragPatch
             p->MouseDragStartX = StartX; p->MouseDragStartY = StartY; p->MouseDragActive = Active;
         }
     }
-    internal void Apply(InputManager* p, int x, int y, int dx, int dy, bool freeLook = false)
+    internal void Apply(InputManager* p, int x, int y, int dx, int dy, bool freeLook = false, bool moveForward = false)
     {
         Restore();
         owner = p;
         saved = Drag.Read(p);
-        // A single native button: left observes without turning the character;
-        // never combine it with simulated right (the game treats both as move).
+        // A single native button turns the camera. The native chord moves the character.
         var button = freeLook ? InputManager.MouseButtonHoldState.Left : InputManager.MouseButtonHoldState.Right;
+        if (moveForward) button = InputManager.MouseButtonHoldState.Left | InputManager.MouseButtonHoldState.Right;
         written = new Drag((int)button, 11f, -dx, -dy, x, y, true);
         written.Write(p);
     }
