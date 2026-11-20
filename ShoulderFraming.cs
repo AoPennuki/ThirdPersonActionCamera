@@ -9,7 +9,7 @@ internal enum ZoomStyle { Dolly, LensWithPan, LensOnly }
 
 internal static class ShoulderFraming
 {
-    internal const byte LalafellRace = 4;
+    internal const byte LalafellRace = 3;
     private const float LalafellScreenRaise = .14f;
     private const float LalafellReticleHeight = .43f;
     private const float ReticleHeadClearance = .025f;
