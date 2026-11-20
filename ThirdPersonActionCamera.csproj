@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <CameraVariant Condition="'$(CameraVariant)' == ''">LensOnly</CameraVariant>
+    <Version Condition="'$(CameraVariant)' == 'Dolly'">0.4.1</Version>
+    <Version Condition="'$(CameraVariant)' == 'LensWithPan'">0.5.1</Version>
+    <Version Condition="'$(CameraVariant)' == 'LensOnly'">0.5.3</Version>
+    <DefineConstants Condition="'$(CameraVariant)' == 'Dolly'">$(DefineConstants);ACTIONCAM_DOLLY</DefineConstants>
+    <DefineConstants Condition="'$(CameraVariant)' == 'LensOnly'">$(DefineConstants);ACTIONCAM_LENS_ONLY</DefineConstants>
+    <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+    <DalamudLibPath Condition="'$(DalamudLibPath)' == ''">$(APPDATA)\XIVLauncherCN\addon\Hooks\15.0.4.0</DalamudLibPath>
+    <PathMap>$(MSBuildProjectDirectory)=/_/src</PathMap>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Dalamud" HintPath="$(DalamudLibPath)\Dalamud.dll" Private="false" />
+    <Reference Include="Dalamud.Bindings.ImGui" HintPath="$(DalamudLibPath)\Dalamud.Bindings.ImGui.dll" Private="false" />
+    <Reference Include="FFXIVClientStructs" HintPath="$(DalamudLibPath)\FFXIVClientStructs.dll" Private="false" />
+    <Reference Include="InteropGenerator.Runtime" HintPath="$(DalamudLibPath)\InteropGenerator.Runtime.dll" Private="false" />
+    <Reference Include="Lumina" HintPath="$(DalamudLibPath)\Lumina.dll" Private="false" />
+    <Reference Include="Lumina.Excel" HintPath="$(DalamudLibPath)\Lumina.Excel.dll" Private="false" />
+    <None Update="LICENSE.md;NOTICE.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="ThirdPersonActionCamera.json" CopyToOutputDirectory="PreserveNewest" Condition="'$(CameraVariant)' == 'LensWithPan'" />
+    <None Update="ThirdPersonActionCamera.dolly.json" TargetPath="ThirdPersonActionCamera.json" CopyToOutputDirectory="Always" Condition="'$(CameraVariant)' == 'Dolly'" />
+    <None Update="ThirdPersonActionCamera.lens-only.json" TargetPath="ThirdPersonActionCamera.json" CopyToOutputDirectory="Always" Condition="'$(CameraVariant)' == 'LensOnly'" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,14 @@
+{
+  "Author": "Local action camera test",
+  "Name": "Third Person Action Camera – Dolly",
+  "InternalName": "ThirdPersonActionCamera",
+  "IconUrl": "https://xivapi.com/i/000000/000053.png",
+  "AssemblyVersion": "0.4.1.0",
+  "Description": "第三人称动作镜头。右键沿原版取景向人物前移，默认右肩时同时往左；保留原版视场角。",
+  "ApplicableVersion": "any",
+  "DalamudApiLevel": 15,
+  "LoadRequiredState": 0,
+  "LoadSync": false,
+  "CanUnloadAsync": false,
+  "AcceptsFeedback": false
+}

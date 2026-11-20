@@ -1,0 +1,15 @@
+{
+  "Author": "Local action camera test",
+  "Name": "Third Person Action Camera – Lens Only",
+  "InternalName": "ThirdPersonActionCamera",
+  "IconUrl": "https://xivapi.com/i/000000/000053.png",
+  "AssemblyVersion": "0.5.3.0",
+  "Punchline": "/acti on 开启，/acti off 关闭。",
+  "Description": "/acti on 开启，/acti off 关闭。",
+  "ApplicableVersion": "any",
+  "DalamudApiLevel": 15,
+  "LoadRequiredState": 0,
+  "LoadSync": false,
+  "CanUnloadAsync": false,
+  "AcceptsFeedback": false
+}

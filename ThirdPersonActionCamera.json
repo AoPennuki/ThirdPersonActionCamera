@@ -1,0 +1,14 @@
+{
+  "Author": "Local action camera test",
+  "Name": "Third Person Action Camera – Lens + Pan",
+  "InternalName": "ThirdPersonActionCamera",
+  "IconUrl": "https://xivapi.com/i/000000/000053.png",
+  "AssemblyVersion": "0.5.1.0",
+  "Description": "第三人称动作镜头。右键缓动至 1.65× 焦段并朝人物收取景，松开平滑恢复。中央准星用于普通目标技能及 <mo>。",
+  "ApplicableVersion": "any",
+  "DalamudApiLevel": 15,
+  "LoadRequiredState": 0,
+  "LoadSync": false,
+  "CanUnloadAsync": false,
+  "AcceptsFeedback": false
+}
