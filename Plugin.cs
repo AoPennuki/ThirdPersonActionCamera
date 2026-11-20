@@ -156,6 +156,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
             (nint)PronounModule.MemberFunctionPointers.ResolvePlaceholder == 0 ||
             (nint)ActionManager.MemberFunctionPointers.UseAction == 0 ||
             (nint)ActionManager.MemberFunctionPointers.GetAdjustedActionId == 0 ||
+            (nint)ActionManager.MemberFunctionPointers.GetSpellIdForAction == 0 ||
             (nint)ActionManager.MemberFunctionPointers.CanUseActionOnTarget == 0 ||
             (ShoulderFraming.Style != ZoomStyle.Dolly &&
              (camera == null || camera->VirtualTable == null || (nint)camera->VirtualTable->Update == 0)) ||
@@ -378,29 +379,37 @@ public sealed unsafe class Plugin : IDalamudPlugin
         finally { view.Restore(scene); }
     }
 
-    private static bool UsesExternalTarget(ActionRow action) => !action.TargetArea &&
-        (action.CanTargetHostile || action.CanTargetParty || action.CanTargetAlliance ||
-         action.CanTargetAlly || action.CanTargetOwnPet || action.CanTargetPartyPet);
+    private static bool UsesExternalTarget(ActionRow action) =>
+        action.CanTargetHostile || action.CanTargetParty || action.CanTargetAlliance ||
+        action.CanTargetAlly || action.CanTargetOwnPet || action.CanTargetPartyPet;
 
     private bool UseAction(ActionManager* manager, ActionType type, uint action, ulong target, uint extra,
         ActionManager.UseActionMode mode, uint combo, bool* area)
     {
         // A queued request already has its target. Explicit macros still resolve their own placeholders.
-        if (captured && !Paused && manager != null && type == ActionType.Action && mode == ActionManager.UseActionMode.None)
+        if (captured && !Paused && manager != null &&
+            type is ActionType.Action or ActionType.PvPAction &&
+            mode is ActionManager.UseActionMode.None or ActionManager.UseActionMode.Combo)
         {
             try
             {
                 var camera = ActiveThirdPersonCamera();
                 if (camera != null)
                 {
-                    uint adjusted = manager->GetAdjustedActionId(action);
-                    if (actions.GetRowOrDefault(adjusted) is { } row && UsesExternalTarget(row))
+                    uint spell = type == ActionType.Action ? action : ActionManager.GetSpellIdForAction(type, action);
+                    uint adjusted = spell == 0 ? 0 : manager->GetAdjustedActionId(spell);
+                    if (adjusted != 0 && actions.GetRowOrDefault(adjusted) is { } row &&
+                        (row.TargetArea || UsesExternalTarget(row)))
                     {
                         var picked = CenterTarget(camera);
-                        if (picked == null || !ActionManager.CanUseActionOnTarget(adjusted, picked)) return false;
-                        ulong id = picked->GetGameObjectId();
-                        if (id is 0 or 0xE0000000) return false;
-                        target = id;
+                        ulong id = picked == null ? 0 : picked->GetGameObjectId();
+                        if (id is not (0 or 0xE0000000))
+                        {
+                            // Ground actions use the object's position as the placement point.
+                            if (!row.TargetArea && !ActionManager.CanUseActionOnTarget(adjusted, picked)) return false;
+                            target = id;
+                        }
+                        else if (!row.TargetArea) return false;
                     }
                 }
             }
