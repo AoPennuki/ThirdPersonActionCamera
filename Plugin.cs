@@ -43,6 +43,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
     private readonly MouseLookState state = new();
     private readonly MouseLookDragPatch drag = new();
     private readonly LensZoom lens = new();
+    private Hook<MouseDevice.Delegates.ProcessMouseInputMessage>? mouseMessageHook;
     private Hook<AtkModule.Delegates.HandleInput>? inputHook;
     private Hook<Camera.Delegates.GetCameraInputSource>? cameraHook;
     private Hook<PronounModule.Delegates.ResolvePlaceholder>? macroHook;
@@ -148,6 +149,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
         var scene = camera == null ? null : &camera->SceneCamera;
         if (InputManager.Instance() == null ||
             (nint)MouseDevice.MemberFunctionPointers.ScheduleCursorMove == 0 ||
+            (nint)MouseDevice.MemberFunctionPointers.ProcessMouseInputMessage == 0 ||
             (nint)AtkCursor.MemberFunctionPointers.SetVisible == 0 ||
             (nint)AtkModule.MemberFunctionPointers.IsTextInputActive == 0 ||
             (nint)TargetSystem.MemberFunctionPointers.GetMouseOverObject == 0 ||
@@ -163,6 +165,8 @@ public sealed unsafe class Plugin : IDalamudPlugin
             scene == null || scene->VirtualTable == null || (nint)scene->VirtualTable->UpdateRender == 0)
             throw new InvalidOperationException("Third-person input or native mouseover is unavailable.");
 
+        mouseMessageHook = interop.HookFromAddress<MouseDevice.Delegates.ProcessMouseInputMessage>(
+            (nint)MouseDevice.MemberFunctionPointers.ProcessMouseInputMessage, ProcessMouseInputMessage);
         inputHook = interop.HookFromAddress<AtkModule.Delegates.HandleInput>(
             (nint)AtkModule.MemberFunctionPointers.HandleInput, HandleInput);
         cameraHook = interop.HookFromAddress<Camera.Delegates.GetCameraInputSource>(
@@ -181,6 +185,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
         viewHook.Enable();
         lensHook?.Enable();
         cameraHook.Enable();
+        mouseMessageHook.Enable();
         inputHook.Enable();
     }
 
@@ -203,6 +208,18 @@ public sealed unsafe class Plugin : IDalamudPlugin
 
     private bool Paused => nativeTextInput || platformTextInput || MouseLookKeys.Down(ReleaseKey);
     private bool CaptureUsable => captured && !Paused && ActiveThirdPersonCamera() != null;
+
+    private void ProcessMouseInputMessage(nint window, uint message, nint parameter)
+    {
+        const uint leftDown = 0x0201, leftDoubleClick = 0x0203;
+        try
+        {
+            // Movement also reads native button state before the UI filter.
+            if (message is leftDown or leftDoubleClick && CaptureUsable) return;
+        }
+        catch (Exception ex) { Fail(ex); }
+        mouseMessageHook!.Original(window, message, parameter);
+    }
 
     private byte HandleInput(AtkModule* module, UIInputData* input, bool padMouse)
     {
@@ -334,7 +351,9 @@ public sealed unsafe class Plugin : IDalamudPlugin
         if (ShoulderFraming.Style == ZoomStyle.Dolly) AdvanceFraming(active);
         framedCamera = scene;
         var magnification = ShoulderFraming.Magnification(aim, aimMagnification);
-        framedOffset = ShoulderFraming.Offsets(scene->Position, scene->LookAtVector, blendedShoulder, magnification, ShoulderFraming.Style);
+        var elevation = ShoulderFraming.AimElevation(objects.LocalPlayer?.CustomizeData.Race ?? 0, lens.UnzoomedFieldOfView(active));
+        framedOffset = ShoulderFraming.Offsets(scene->Position, scene->LookAtVector, blendedShoulder,
+            magnification, ShoulderFraming.Style, elevation);
         var view = new ShoulderViewScope(scene, framedOffset);
         framingView = true;
         try { viewHook!.Original(scene); }
@@ -493,12 +512,14 @@ public sealed unsafe class Plugin : IDalamudPlugin
     private void DisposeHooks()
     {
         inputHook?.Dispose();
+        mouseMessageHook?.Dispose();
         actionHook?.Dispose();
         viewHook?.Dispose();
         lensHook?.Dispose();
         cameraHook?.Dispose();
         macroHook?.Dispose();
         inputHook = null;
+        mouseMessageHook = null;
         actionHook = null;
         viewHook = null;
         lensHook = null;

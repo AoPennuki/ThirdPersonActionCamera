@@ -5,9 +5,9 @@
 FF14 第三人称动作镜头。鼠标直控镜头，中央准星选目标，按住右键进行 1.65× 平滑变焦。插件加载后默认关闭。
 
 1. 从 [GitHub Releases](https://github.com/AoPennuki/ThirdPersonActionCamera/releases) 下载并解压测试包，在 Dalamud 的开发插件设置中添加 `ThirdPersonActionCamera.dll`。
-2. 切到第三人称，输入 `/acti on` 开启。默认右肩，角色出现在准星左侧，移动鼠标可转动镜头。用 `/acti left`、`/acti right` 或 `/acti center` 切换构图。
+2. 切到第三人称，输入 `/acti on` 开启。默认右肩，移动鼠标可转动镜头。拉拉菲尔的默认瞄准方向更高。用 `/acti left`、`/acti right` 或 `/acti center` 切换构图。
 3. 直接按目标技能或 PvP 单键连击，以准星下的合法对象为目标。目标型范围技能遵循同一规则。地面技能在准星指向对象时把对象位置交给游戏定位，准星下无对象时使用游戏的地面选点。自用技能、已有宏和已排队的技能沿用原规则。
-4. 按住 **鼠标右键**触发所选版本的放大，松开恢复。用 `/acti zoom 2` 可临时调整倍率。
+4. 按住 **鼠标右键**平滑放大，松开恢复。动作镜头捕获鼠标时，左右键同按只触发右键变焦。用 `/acti zoom 2` 可临时调整倍率。
 5. 按住 **Alt** 可以临时操作光标。输入 `/acti off` 关闭，`/acti status` 查看状态。
 
 v0.5.3 开始提供 `/acti` 短命令。原来的 `/actioncam` 仍可以使用。

@@ -9,6 +9,9 @@ internal enum ZoomStyle { Dolly, LensWithPan, LensOnly }
 
 internal static class ShoulderFraming
 {
+    private const byte LalafellRace = 4;
+    private const float LalafellAimRaise = .14f;
+
 #if ACTIONCAM_DOLLY
     internal const float DefaultMagnification = 3.0f;
     internal static readonly ZoomStyle Style = ZoomStyle.Dolly;
@@ -34,8 +37,13 @@ internal static class ShoulderFraming
     internal static float ZoomFieldOfView(float fieldOfView, float magnification) =>
         2f * MathF.Atan(MathF.Tan(fieldOfView * .5f) / magnification);
 
+    internal static float AimElevation(byte race, float unzoomedFieldOfView) =>
+        race == LalafellRace && unzoomedFieldOfView is > 0f and < MathF.PI
+            ? MathF.Atan(2f * LalafellAimRaise * MathF.Tan(unzoomedFieldOfView * .5f))
+            : 0f;
+
     internal static (Vector3 Position, Vector3 LookAt) Offsets(Vector3 position, Vector3 lookAt, float shoulder,
-        float magnification, ZoomStyle style)
+        float magnification, ZoomStyle style, float elevation)
     {
         var view = lookAt - position;
         float distance = view.Length();
@@ -56,9 +64,9 @@ internal static class ShoulderFraming
             // look-at point. Heading stays fixed as the origin moves inward.
             float approach = Math.Min(1f - 1f / magnification, Math.Max(0f, 1f - 1.1f / distance));
             var translated = offset * (1f - approach) + view * approach;
-            return (translated, translated);
+            return (translated, translated + ElevationDelta(view, elevation));
         }
-        if (style == ZoomStyle.LensOnly) return (offset, offset);
+        if (style == ZoomStyle.LensOnly) return (offset, offset + ElevationDelta(view, elevation));
 
         // Pan the optical axis toward the character as the lens tightens.
         // Keep the same screen-side clearance as the unzoomed shoulder view.
@@ -66,7 +74,18 @@ internal static class ShoulderFraming
         float desiredBearing = MathF.Atan2(lateral / magnification, distance);
         float pan = desiredBearing - bearing;
         var pannedView = view * MathF.Cos(pan) + right * (MathF.Sin(pan) * distance);
-        return (offset, offset + (pannedView - view));
+        return (offset, offset + (pannedView - view) + ElevationDelta(pannedView, elevation));
+    }
+
+    private static Vector3 ElevationDelta(Vector3 view, float elevation)
+    {
+        if (elevation == 0f) return default;
+        var right = Vector3.Cross(view, Vector3.UnitY);
+        float horizontal = right.Length();
+        float pitch = MathF.Atan2(view.Y, horizontal);
+        float rotation = Math.Min(elevation, Math.Max(0f, 89.5f * MathF.PI / 180f - pitch));
+        var up = Vector3.Cross(right / horizontal, view);
+        return view * (MathF.Cos(rotation) - 1f) + up * MathF.Sin(rotation);
     }
 }
 
@@ -101,6 +120,10 @@ internal sealed unsafe class LensZoom
 
     private readonly record struct Lens(float FieldOfView, float Minimum, float Maximum);
 
+    internal float UnzoomedFieldOfView(GameCamera* camera) =>
+        owner == (nint)camera && (camera->FoV == applied || (camera->MinFoV == applied && camera->MaxFoV == applied))
+            ? original.FieldOfView : camera->FoV;
+
     internal void Apply(GameCamera* camera, float magnification)
     {
         if (magnification <= 1f)
@@ -109,9 +132,8 @@ internal sealed unsafe class LensZoom
             return;
         }
         bool same = owner == (nint)camera;
-        bool ownsLimits = same && camera->MinFoV == applied && camera->MaxFoV == applied;
         var baseline = new Lens(
-            ownsLimits || (same && camera->FoV == applied) ? original.FieldOfView : camera->FoV,
+            UnzoomedFieldOfView(camera),
             same && camera->MinFoV == applied ? original.Minimum : camera->MinFoV,
             same && camera->MaxFoV == applied ? original.Maximum : camera->MaxFoV);
         if (!(baseline.FieldOfView is > 0f and < MathF.PI))

@@ -8,7 +8,7 @@
     <CameraVariant Condition="'$(CameraVariant)' == ''">LensOnly</CameraVariant>
     <Version Condition="'$(CameraVariant)' == 'Dolly'">0.4.1</Version>
     <Version Condition="'$(CameraVariant)' == 'LensWithPan'">0.5.1</Version>
-    <Version Condition="'$(CameraVariant)' == 'LensOnly'">0.5.4</Version>
+    <Version Condition="'$(CameraVariant)' == 'LensOnly'">0.5.5</Version>
     <DefineConstants Condition="'$(CameraVariant)' == 'Dolly'">$(DefineConstants);ACTIONCAM_DOLLY</DefineConstants>
     <DefineConstants Condition="'$(CameraVariant)' == 'LensOnly'">$(DefineConstants);ACTIONCAM_LENS_ONLY</DefineConstants>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
