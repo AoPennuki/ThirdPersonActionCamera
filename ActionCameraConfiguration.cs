@@ -63,7 +63,7 @@ internal sealed class ActionCameraConfiguration : IPluginConfiguration
 
     internal void SetJob(uint id, JobFraming framing)
     {
-        framing = new(ClampFinite(framing.ShoulderCm, -60f, 60f, 0f), ClampFinite(framing.PitchDegrees, -8f, 8f, 0f),
+        framing = new(ClampFinite(framing.PitchDegrees, -8f, 8f, 0f),
             ClampFinite(framing.ReticleRight, -.25f, .25f, 0f), ClampFinite(framing.ReticleUp, -.25f, .25f, 0f));
         if (id == 0 || framing == default) JobAdjustments.Remove(id);
         else JobAdjustments[id] = framing;
@@ -108,4 +108,4 @@ internal sealed class ActionCameraConfiguration : IPluginConfiguration
         float.IsFinite(value) ? Math.Clamp(value, minimum, maximum) : fallback;
 }
 
-internal readonly record struct JobFraming(float ShoulderCm, float PitchDegrees, float ReticleRight, float ReticleUp);
+internal readonly record struct JobFraming(float PitchDegrees, float ReticleRight, float ReticleUp);

@@ -399,7 +399,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
         var job = configuration.ForJob(player?.ClassJob.RowId ?? 0);
         var elevation = ShoulderFraming.AimElevation(configuration.PitchFor(race) + job.PitchDegrees);
         framedOffset = ShoulderFraming.Offsets(scene->Position, scene->LookAtVector, blendedShoulder,
-            magnification, ShoulderFraming.Style, elevation, job.ShoulderCm);
+            magnification, ShoulderFraming.Style, elevation);
         var motion = SampleMinionCamera(active, framedOffset);
         framedOffset = (framedOffset.Position + motion, framedOffset.LookAt + motion);
         var view = new ShoulderViewScope(scene, framedOffset);
@@ -759,11 +759,10 @@ public sealed unsafe class Plugin : IDalamudPlugin
                 ImGui.TextUnformatted(job.Name.ExtractText());
                 var framing = configuration.ForJob(job.RowId);
                 bool save = false;
-                float shoulder = SliderWithReset("镜头左右", framing.ShoulderCm, -60f, 60f, 0f, "%+.0f cm", ref save);
                 float pitch = SliderWithReset("镜头抬高", framing.PitchDegrees, -8f, 8f, 0f, "%+.1f°", ref save);
                 float right = SliderWithReset("准星左右", framing.ReticleRight, -.25f, .25f, 0f, "%+.1f%%", ref save, 100f);
                 float up = SliderWithReset("准星上移", framing.ReticleUp, -.25f, .25f, 0f, "%+.1f%%", ref save, 100f);
-                framing = new(shoulder, pitch, right, up);
+                framing = new(pitch, right, up);
                 if (ImGui.Button("重置当前职业"))
                 {
                     framing = default;

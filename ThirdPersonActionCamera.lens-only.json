@@ -3,7 +3,7 @@
   "Name": "Third Person Action Camera – Lens Only",
   "InternalName": "ThirdPersonActionCamera",
   "IconUrl": "https://xivapi.com/i/000000/000053.png",
-  "AssemblyVersion": "0.5.43.0",
+  "AssemblyVersion": "0.5.43.1",
   "Punchline": "/动作模式 开、/动作模式 关",
   "Description": "/动作模式 开、/动作模式 关、/动作模式 设置",
   "ApplicableVersion": "any",

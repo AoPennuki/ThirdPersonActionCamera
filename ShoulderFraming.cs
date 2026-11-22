@@ -39,7 +39,7 @@ internal static class ShoulderFraming
         float.IsFinite(degrees) ? Math.Clamp(degrees, -16f, 16f) * MathF.PI / 180f : 0f;
 
     internal static (Vector3 Position, Vector3 LookAt) Offsets(Vector3 position, Vector3 lookAt, float shoulder,
-        float magnification, ZoomStyle style, float elevation, float shoulderCm)
+        float magnification, ZoomStyle style, float elevation)
     {
         var view = lookAt - position;
         float distance = view.Length();
@@ -51,7 +51,7 @@ internal static class ShoulderFraming
         // Fade the shift near an already close camera, such as when the
         // engine pulls the orbit in during a collision.
         float clearance = Math.Clamp((distance - 1.1f) / 1.4f, 0f, 1f);
-        float lateral = (shoulder * .62f + shoulderCm * .01f) * clearance;
+        float lateral = shoulder * .62f * clearance;
         var right = side / horizontal;
         var offset = right * lateral;
         if (style == ZoomStyle.Dolly)
