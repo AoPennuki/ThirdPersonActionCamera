@@ -6,7 +6,8 @@ namespace PovPlus;
 
 internal static class MouseLookKeys
 {
-    internal const int DefaultKey = 0x12; // Alt; Win32 virtual-key codes, not game keybind IDs.
+    internal const int DefaultKey = 0x79; // F10 (Win32 virtual-key code).
+    internal const int Alt = 0x12;
     internal static readonly int[] Allowed = BuildKeys();
     [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int key);
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
@@ -16,6 +17,15 @@ internal static class MouseLookKeys
         get { GetWindowThreadProcessId(GetForegroundWindow(), out var process); return process == Environment.ProcessId; }
     }
     internal static bool Down(int key) => (GetAsyncKeyState(key) & 0x8000) != 0;
+    internal static bool OtherKeyboardKeyDown()
+    {
+        // Virtual keys below 0x08 include mouse buttons. Both physical Alt
+        // keys also report the generic Alt state and belong to the same hold.
+        for (int key = 0x08; key <= 0xFE; key++)
+            if (key is not (Alt or 0xA4 or 0xA5) && Down(key))
+                return true;
+        return false;
+    }
     internal static bool Modifier(int key) => key is 0x10 or 0x11 or 0x12;
     internal static int Modifiers => (Down(0x11) ? 1 : 0) | (Down(0x12) ? 2 : 0) | (Down(0x10) ? 4 : 0);
     internal static bool Valid(int key) => Array.IndexOf(Allowed, key) >= 0;

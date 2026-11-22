@@ -10,10 +10,6 @@ internal enum ZoomStyle { Dolly, LensWithPan, LensOnly }
 internal static class ShoulderFraming
 {
     internal const byte LalafellRace = 3;
-    private const float LalafellScreenRaise = .14f;
-    private const float LalafellReticleHeight = .43f;
-    private const float ReticleHeadClearance = .025f;
-
 #if ACTIONCAM_DOLLY
     internal const float DefaultMagnification = 3.0f;
     internal static readonly ZoomStyle Style = ZoomStyle.Dolly;
@@ -39,19 +35,11 @@ internal static class ShoulderFraming
     internal static float ZoomFieldOfView(float fieldOfView, float magnification) =>
         2f * MathF.Atan(MathF.Tan(fieldOfView * .5f) / magnification);
 
-    // Tilting down moves a fixed world point up in the rendered image.
-    internal static float AimElevation(byte race, float unzoomedFieldOfView) =>
-        race == LalafellRace && unzoomedFieldOfView is > 0f and < MathF.PI
-            ? -MathF.Atan(2f * LalafellScreenRaise * MathF.Tan(unzoomedFieldOfView * .5f))
-            : 0f;
-
-    internal static float LalafellReticleY(float headY) =>
-        float.IsFinite(headY)
-            ? Math.Clamp(headY - ReticleHeadClearance, .08f, LalafellReticleHeight)
-            : LalafellReticleHeight;
+    internal static float AimElevation(float degrees) =>
+        float.IsFinite(degrees) ? Math.Clamp(degrees, -16f, 16f) * MathF.PI / 180f : 0f;
 
     internal static (Vector3 Position, Vector3 LookAt) Offsets(Vector3 position, Vector3 lookAt, float shoulder,
-        float magnification, ZoomStyle style, float elevation)
+        float magnification, ZoomStyle style, float elevation, float shoulderCm)
     {
         var view = lookAt - position;
         float distance = view.Length();
@@ -63,7 +51,7 @@ internal static class ShoulderFraming
         // Fade the shift near an already close camera, such as when the
         // engine pulls the orbit in during a collision.
         float clearance = Math.Clamp((distance - 1.1f) / 1.4f, 0f, 1f);
-        float lateral = shoulder * .62f * clearance;
+        float lateral = (shoulder * .62f + shoulderCm * .01f) * clearance;
         var right = side / horizontal;
         var offset = right * lateral;
         if (style == ZoomStyle.Dolly)
